@@ -54,6 +54,7 @@ cse <- function(reg) {
 #   2. Data section
 #==============================================================================
 
+# Either check for CSV or check for Rdata 
 # after downloading CSV file from IPUMS I read it in as acsMajor, save it as a RData file,
 # and comment out the line as I will not be reading in the CSV file again.
 
@@ -79,7 +80,7 @@ create_occupation_subset <- function(occu_code, education_minimum, age_lower, ag
   
   # create Rdata and csv file (are both completely necessary?)
   save(masters_lawyers_midage_subset, file="masters_lawyers_midage_subset.Rdata")
-  write.csv(masters_lawyers_midage_subset, file="masters_lawyers_midage_subset.csv")
+  # write.csv(masters_lawyers_midage_subset, file="masters_lawyers_midage_subset.csv")
   
   
   return(masters_lawyers_midage_subset)
@@ -103,8 +104,9 @@ masters_lawyers_midage_subset <- create_occupation_subset(178,114,27,62)
 
 # why do we recode cpi?
 # add CPI to the column 
-subset1w$cpi=recode(subset1w$YEAR, "2009=214.537; 2010=218.056; 2011=224.939; 2012=229.594; 2013=232.957")
-subset1w$INCEARNadj2=(subset1w$INCEARN)*233.707/(subset1w$cpi)
+# TO DO: create new column instead of recoding variables
+masters_lawyers_midage_subset$cpi=recode(masters_lawyers_midage_subset$YEAR, "2009=214.537; 2010=218.056; 2011=224.939; 2012=229.594; 2013=232.957")
+masters_lawyers_midage_subset$INCEARNadj2=(masters_lawyers_midage_subset$INCEARN)*233.707/(masters_lawyers_midage_subset$cpi)
 
 # why do we generate estimation subsample 2, or how it diff from sbsmple1 
 # generating estimation subsample2
@@ -116,12 +118,30 @@ subset1w$INCEARNadj2=(subset1w$INCEARN)*233.707/(subset1w$cpi)
 # frequency table for top majors to replicate Winters (2016, Table 1)
 
 sort_degfield <- function(s) {
+  # somehow add column for earnings onto dataframe
   x = count(s, 'DEGFIELDD')
-  sorted_degfield <- x[order(x$freq),]
+  sorted_degfield <- x[order(-x$freq),]
   return (sorted_degfield)
 }
 
-sort_degfield(masters_lawyers_midage_subset)
+sorted_major_freq <- sort_degfield(masters_lawyers_midage_subset)
+sorted_major_freq$percent <- (sorted_major_freq$freq / sum(sorted_major_freq$freq))
+
+sorted_major_freq
+
+get_means <- function(deg) {
+  return (weighted.mean(subset(
+    masters_lawyers_midage_subset,DEGFIELDD==deg)$INCEARNadj2,
+    subset(masters_lawyers_midage_subset,DEGFIELDD==deg)$PERWT))
+}
+
+sorted_major_freq$mean <- lapply(sorted_major_freq$DEGFIELDD, get_means)
+sorted_major_freq
+
+# create object of lawyers subset with just selected major
+# calculate summary stats for current subset
+subset(masters_lawyers_midage_subset,masters_lawyers_midage_subset$DEGFIELDD==degfield)
+
 
 # print top 20 majors and percentage of total subset 
 # replace degfield numbers with matching human readable words and merge
@@ -137,8 +157,8 @@ sort_degfield(masters_lawyers_midage_subset)
 
 ## TO DO: change stargazer table function to only summarize stats for income var
 
-stargazer(subset(subset2w, econ==1), type="text", summary.stat=c("n", "mean", "median", "sd", "min", "max" ), digits=2, title="ACS Earnings Major Summary Statistics")
-stargazer(subset1w, type="text", summary.stat=c("n", "mean", "median", "sd", "min", "max" ), digits=2, title="ACS Earnings Major Summary Statistics")
+stargazer(subset(masters_lawyers_midage_subset, econ==1), type="text", summary.stat=c("n", "mean", "median", "sd", "min", "max" ), digits=2, title="ACS Earnings Major Summary Statistics")
+stargazer(masters_lawyers_midage_subset, type="text", summary.stat=c("n", "mean", "median", "sd", "min", "max" ), digits=2, title="ACS Earnings Major Summary Statistics")
 
 # This command finds mean earnings are 187,873.9 and median are 139,437.5,
 # This is somewhat higher than Winters (2016) who reported 182,359 and 130,723, respectively.
@@ -153,39 +173,14 @@ summary(reg1)
 
 # create function that takes a degree/major and calculates frequency 
 
-# create function that takes degree and calculates weighted.mean
-
-# loop function through list of degfield codes 
-
-# loop through top 20 major array and all calc major stats 
-
-calc_major_stats <- function(degfield) {
-  # Weighted Arithmetic Mean & Median
-  # how do we rename variable name to the degree field
-  # should we create a dictionary variable from the code book 
-  # create summary stats object overall??? (variance, mean, etc)
-  # create data frame by looping through each degfieldd and creating extra data frame with summary stats
-  # mean, median, variance, etc 
-  
-  # change subsets
-  # return more than just mean/median
-  maj_mean <- weighted.mean(subset(subset2w, DEGFIELDD==degfield)$INCEARNadj2, subset(subset2w,DEGFIELDD==degfield)$PERWT, na.rm = FALSE)
-  maj_med <- weighted.median(subset(subset2w, DEGFIELDD==degfield)$INCEARNadj2, subset(subset2w, DEGFIELDD==degfield)$PERWT, na.rm = FALSE)
-  
-  # change to return dataframe 
-  return(maj_mean)
-}
-
-# call loop on top 20 majors 
-calc_major_stats(5506)
 
 mean_hist=weighted.mean(subset(subset2w, history==1)$INCEARNadj2, subset(subset2w, history==1)$PERWT, na.rm = FALSE)
 med_hist=weighted.median(subset(subset2w, history==1)$INCEARNadj2, subset(subset2w, history==1)$PERWT, na.rm = FALSE)
 
 #5506	Political Science and Government
 
-mean_pols=weighted.mean(subset(subset2w, DEGFIELDD==5506)$INCEARNadj2, subset(subset2w, DEGFIELDD==5506)$PERWT, na.rm = FALSE)
-med_pols=weighted.median(subset(subset2w, DEGFIELDD==5506)$INCEARNadj2, subset(subset2w, DEGFIELDD==5506)$PERWT, na.rm = FALSE)
+mean_pols=weighted.mean(subset(masters_lawyers_midage_subset, DEGFIELDD==5506)$INCEARNadj2, subset(masters_lawyers_midage_subset, DEGFIELDD==5506)$PERWT, na.rm = FALSE)
+med_pols=weighted.median(subset(masters_lawyers_midage_subset, DEGFIELDD==5506)$INCEARNadj2, subset(masters_lawyers_midage_subset, DEGFIELDD==5506)$PERWT, na.rm = FALSE)
 
 #3301	English Language and Literature
 #5200	Psychology
