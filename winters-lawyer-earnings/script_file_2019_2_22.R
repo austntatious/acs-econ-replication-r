@@ -93,6 +93,7 @@ masters_lawyers_midage_subset <- create_occupation_subset(178,114,27,62)
 
 # generating econ and history major variables based on Winters (2016)
 # EDIT: REMOVING THIS CODE SO THAT WE CAN SIMPLY USE DEGFIELD FUNCTION
+# TO DO: Actually, does adding the means of separate econ majors equal the mean calculated at once?
 # masters_lawyers_midage_subset$econ=recode(subset1w$DEGFIELDD, "5501=1; 6205=1 ; else=0")
 # masters_lawyers_midage_subset=recode(subset1w$DEGFIELDD, "6402=1; 6403=1 ; else=0")
 
@@ -108,15 +109,12 @@ masters_lawyers_midage_subset <- create_occupation_subset(178,114,27,62)
 masters_lawyers_midage_subset$cpi=recode(masters_lawyers_midage_subset$YEAR, "2009=214.537; 2010=218.056; 2011=224.939; 2012=229.594; 2013=232.957")
 masters_lawyers_midage_subset$INCEARNadj2=(masters_lawyers_midage_subset$INCEARN)*233.707/(masters_lawyers_midage_subset$cpi)
 
-# why do we generate estimation subsample 2, or how it diff from sbsmple1 
-# generating estimation subsample2
-
 #==============================================================================
 #   3. Analysis section
 #==============================================================================
 
 # frequency table for top majors to replicate Winters (2016, Table 1)
-
+# sort freq table in descending order
 sort_degfield <- function(s) {
   # somehow add column for earnings onto dataframe
   x = count(s, 'DEGFIELDD')
@@ -124,37 +122,50 @@ sort_degfield <- function(s) {
   return (sorted_degfield)
 }
 
+# calculate cumulative percentages of majors
 sorted_major_freq <- sort_degfield(masters_lawyers_midage_subset)
 sorted_major_freq$percent <- (sorted_major_freq$freq / sum(sorted_major_freq$freq))
-
 sorted_major_freq
 
+# create function that takes degree and calculates weighted mean
+# to do: change syntax to be more concise
 get_means <- function(deg) {
   return (weighted.mean(subset(
     masters_lawyers_midage_subset,DEGFIELDD==deg)$INCEARNadj2,
     subset(masters_lawyers_midage_subset,DEGFIELDD==deg)$PERWT))
 }
 
+# Note: not working properly - medians are not displaying
+get_medians <- function(deg) {
+  return (weighted.median(subset(
+    masters_lawyers_midage_subset,DEGFIELDD==deg)$INCEARNadj2,
+    subset(masters_lawyers_midage_subset,DEGFIELDD==deg)$PERWT))
+}
+
+# append means to the sorted majors
 sorted_major_freq$mean <- lapply(sorted_major_freq$DEGFIELDD, get_means)
+
+# to do: fix median 
+#sorted_major_freq$median <- lapply(sorted_major_freq$DEGFIELDD, get_medians)
+
 sorted_major_freq
 
+
+
+# If you want to compute means of combined majors (business econ and regular econ),
+# compute the weighted mean of both sets of data and combine them to find the total mean 
+
 # create object of lawyers subset with just selected major
-# calculate summary stats for current subset
-subset(masters_lawyers_midage_subset,masters_lawyers_midage_subset$DEGFIELDD==degfield)
+# todo: calculate summary stats for current subset
+# subset(masters_lawyers_midage_subset,masters_lawyers_midage_subset$DEGFIELDD==degfield)
 
-
-# print top 20 majors and percentage of total subset 
-# replace degfield numbers with matching human readable words and merge
-# Sort top 20 majors and output names & percentages 
-# take array of top 20 majors and output variables for each major
-
+# todo: replace degfield numbers with matching human readable words and merge
 
 # write.csv(degfield_counts, file = "degrees_ddd_tabulate.csv")
 
 #The results are identical to his to two decimal places (except History is slightly off)
 
 # try sum stats table to replicate Winters (2016, Table 2)
-
 ## TO DO: change stargazer table function to only summarize stats for income var
 
 stargazer(subset(masters_lawyers_midage_subset, econ==1), type="text", summary.stat=c("n", "mean", "median", "sd", "min", "max" ), digits=2, title="ACS Earnings Major Summary Statistics")
@@ -164,7 +175,7 @@ stargazer(masters_lawyers_midage_subset, type="text", summary.stat=c("n", "mean"
 # This is somewhat higher than Winters (2016) who reported 182,359 and 130,723, respectively.
 # Try weighting the average using a regression approach
 
-reg1=lm(INCEARNadj2~econ, data=subset2w, weights=subset2w$PERWT)
+reg1=lm(INCEARNadj2~econ, data=masters_lawyers_midage_subset, weights=masters_lawyers_midage_subset$PERWT)
 summary(reg1)
 
 # Adding the coefficients 149708.6+32649.9=182,358.5. This is identical to Winters.
